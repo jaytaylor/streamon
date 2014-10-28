@@ -1,10 +1,8 @@
-package commandmonitor
+package streamon
 
 import (
-	//"os/exec"
 	"regexp"
 	"testing"
-	"time"
 )
 
 type (
@@ -13,7 +11,7 @@ type (
 )
 
 var (
-	// 'test-app_v1_web_10023' changed state to [STARTING]
+	// Consumes: 'test-app_v1_web_10023' changed state to [STARTING]
 	dynoStateParserRe = regexp.MustCompile(`'([^']+) changed state to \[([^\]]+)\]'`)
 )
 
@@ -34,7 +32,68 @@ func Test_NewCommandListener(t *testing.T) {
 	}
 }
 
-func Test_CommandListener(t *testing.T) {
+// Test for map[string]string equivalence.
+func eq(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if w, ok := b[k]; !ok || v != w {
+			return false
+		}
+	}
+	return true
+}
+
+func testAttach(t *testing.T, attachCommand []string, filterRe *regexp.Regexp, expectedState map[string]string) {
+	commandListener, err := NewCommandListener(attachCommand, filterRe)
+	if err != nil {
+		t.Fatal("unexpected error creating command with `NewCommandListener`: %v", err)
+	}
+	ch := make(chan []string)
+	if commandListener.Attach(ch).Error != nil {
+		t.Fatalf("unexpected error attaching: %v", commandListener.Error)
+	}
+	state := map[string]string{}
+	for ch != nil {
+		select {
+		case match, ok := <-ch:
+			if !ok {
+				ch = nil
+				break
+			}
+			t.Logf("match=%v\n", match)
+			if len(match) != 3 {
+				t.Fatalf("expected match to find 3 elements in match list but found %v (%v)", len(match), match)
+			}
+			state[match[1]] = match[2]
+		}
+	}
+	if !eq(state, expectedState) {
+		t.Fatalf("unexpected state=%v, expected=%v", state, expectedState)
+	}
+}
+
+func Test_CommandListener1(t *testing.T) {
+	attachCommand := []string{
+		"bash",
+		"-c",
+		`echo "'test-app_v1_web_10023' changed state to [STARTING]"
+echo "'test-app_v1_web_10023' changed state to [RUNNING]"
+echo "'test-app_v1_web_10023' changed state to [STOPPING]"
+echo "'test-app_v1_web_10024' changed state to [STARTING]"
+echo "'test-app_v1_web_10023' changed state to [STOPPED]"
+echo "'test-app_v1_web_10024' changed state to [RUNNING]"
+echo "'test-app_v1_web_10023' changed state to [STARTING]"
+echo "'test-app_v1_web_10024' changed state to [STOPPED]"
+echo "'test-app_v1_web_10023' changed state to [RUNNING]"`,
+	}
+	filterRe := regexp.MustCompile(`'([^']+)' changed state to \[([^\]]+)\]`)
+	expectedState := map[string]string{"test-app_v1_web_10023": "RUNNING", "test-app_v1_web_10024": "STOPPED"}
+	testAttach(t, attachCommand, filterRe, expectedState)
+}
+
+func Test_CommandListener2(t *testing.T) {
 	attachCommand := []string{
 		"bash",
 		"-c",
@@ -46,78 +105,6 @@ echo "'test-app_v1_web_10023' changed state to [STARTING]" ; sleep 1 ;
 echo "'test-app_v1_web_10023' changed state to [RUNNING]" ; sleep 1 ; `,
 	}
 	filterRe := regexp.MustCompile(`'([^']+)' changed state to \[([^\]]+)\]`)
-	commandListener, err := NewCommandListener(attachCommand, filterRe)
-	if err != nil {
-		t.Fatal("error creating command with `NewCommandListener`: %v", err)
-	}
-	//t.Log("cl=%v", commandListener)
-	ch := make(chan []string)
-	go commandListener.Attach(ch)
-	//time.Sleep(500 * time.Millisecond)
-	state := map[string]string{}
-	for {
-		time.Sleep(500 * time.Millisecond)
-		if !commandListener.Running {
-			t.Log("not runnni")
-			break
-		}
-		select {
-		case match := <-ch:
-			t.Logf("match=%v\n", match)
-			if len(match) != 3 {
-				t.Fatalf("expected match to find 3 elements in match list but found %v (%v)", len(match), match)
-			}
-			state[match[1]] = match[2]
-		}
-	}
 	expectedState := map[string]string{"test-app_v1_web_10023": "RUNNING"}
-	if state["test-app_v1_web_10023"] != expectedState["test-app_v1_web_10023"] {
-		t.Fatalf("unexpected state=%v, expected=%v", state, expectedState)
-	}
-	//time.Sleep(10 * time.Second)
-	// commandListener
-}
-
-//func (this *TestDynoStateChangeListener) Attach() {
-
-//}
-
-func NewState(input string) (string, error) {
-	return input, nil
-}
-
-// func Test_StatusMonitor(t *testing.T) {
-// 	//listener := NodeDynoStateChangeListener{"testlab-sb.threatstream.com"}
-// 	listener := TestCommandListener{}
-// 	ch := make(chan string)
-// 	go AttachCommandListener(listener, ch)
-// 	time.Sleep(10000000000)
-// }
-
-func Test_NewDynoState(t *testing.T) {
-	type StateTest struct {
-		Input          string
-		ExpectedResult string
-		ExpectedError  error
-	}
-
-	testCases := []StateTest{
-		StateTest{
-			Input:          `'test-app_v1_web_10023' changed state to [STARTING]`,
-			ExpectedResult: "okay",
-			ExpectedError:  nil,
-		},
-		StateTest{
-			Input:          `'test-app_v1_web_10023' changed state to [STARTING]`,
-			ExpectedResult: "hrm",
-			ExpectedError:  nil,
-		},
-	}
-
-	for _, testCase := range testCases {
-		_, err := NewState(testCase.Input)
-		if err != nil {
-			t.Errorf(`got unexpcted error with input "%v"`, testCase.Input)
-		}
-	}
+	testAttach(t, attachCommand, filterRe, expectedState)
 }
