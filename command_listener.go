@@ -11,14 +11,14 @@ import (
 
 var ErrEmptyAttachCommand = errors.New("attachCommand must not be empty")
 
-type (
-	CommandListener struct {
-		AttachCommand []string
-		FilterRe      *regexp.Regexp
-		Error         error
-	}
-)
+type CommandListener struct {
+	AttachCommand []string
+	FilterRe      *regexp.Regexp
+	Error         error
+}
 
+// Optionally, filterRe may be nil.  When this is the case, each line of command output will be sent
+// directly to the channel with no regular expression filtering applied.
 func NewCommandListener(attachCommand []string, filterRe *regexp.Regexp) (*CommandListener, error) {
 	if len(attachCommand) == 0 {
 		return nil, ErrEmptyAttachCommand
@@ -47,7 +47,9 @@ func (this *CommandListener) Attach(ch chan []string) *CommandListener {
 		scanner := bufio.NewScanner(reader)
 		for scanner.Scan() {
 			text := scanner.Text()
-			if this.FilterRe != nil && this.FilterRe.MatchString(text) {
+			if this.FilterRe == nil {
+				ch <- []string{text}
+			} else if this.FilterRe.MatchString(text) {
 				match := this.FilterRe.FindStringSubmatch(text)
 				//log.Printf("match=%v\n", match)
 				ch <- match

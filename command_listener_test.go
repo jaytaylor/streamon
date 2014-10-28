@@ -63,10 +63,17 @@ func testAttach(t *testing.T, attachCommand []string, filterRe *regexp.Regexp, e
 				break
 			}
 			t.Logf("match=%v\n", match)
-			if len(match) != 3 {
+			if filterRe == nil && len(match) != 1 {
+				t.Fatalf("expected match to contain 1 element in match list but found %v (%v)", len(match), match)
+			}
+			if filterRe != nil && len(match) != 3 {
 				t.Fatalf("expected match to find 3 elements in match list but found %v (%v)", len(match), match)
 			}
-			state[match[1]] = match[2]
+			if filterRe != nil {
+				state[match[1]] = match[2]
+			} else {
+				state[match[0]] = match[0]
+			}
 		}
 	}
 	if !eq(state, expectedState) {
@@ -74,7 +81,33 @@ func testAttach(t *testing.T, attachCommand []string, filterRe *regexp.Regexp, e
 	}
 }
 
-func Test_CommandListener1(t *testing.T) {
+func Test_CommandListenerNilFilterRe(t *testing.T) {
+	attachCommand := []string{
+		"bash",
+		"-c",
+		`echo "'test-app_v1_web_10023' changed state to [STARTING]"
+echo "'test-app_v1_web_10023' changed state to [RUNNING]"
+echo "'test-app_v1_web_10023' changed state to [STOPPING]"
+echo "'test-app_v1_web_10024' changed state to [STARTING]"
+echo "'test-app_v1_web_10023' changed state to [STOPPED]"
+echo "'test-app_v1_web_10024' changed state to [RUNNING]"
+echo "'test-app_v1_web_10023' changed state to [STARTING]"
+echo "'test-app_v1_web_10024' changed state to [STOPPED]"
+echo "'test-app_v1_web_10023' changed state to [RUNNING]"`,
+	}
+	expectedState := map[string]string{
+		"'test-app_v1_web_10023' changed state to [RUNNING]":  "'test-app_v1_web_10023' changed state to [RUNNING]",
+		"'test-app_v1_web_10023' changed state to [STARTING]": "'test-app_v1_web_10023' changed state to [STARTING]",
+		"'test-app_v1_web_10023' changed state to [STOPPED]":  "'test-app_v1_web_10023' changed state to [STOPPED]",
+		"'test-app_v1_web_10023' changed state to [STOPPING]": "'test-app_v1_web_10023' changed state to [STOPPING]",
+		"'test-app_v1_web_10024' changed state to [RUNNING]":  "'test-app_v1_web_10024' changed state to [RUNNING]",
+		"'test-app_v1_web_10024' changed state to [STARTING]": "'test-app_v1_web_10024' changed state to [STARTING]",
+		"'test-app_v1_web_10024' changed state to [STOPPED]":  "'test-app_v1_web_10024' changed state to [STOPPED]",
+	}
+	testAttach(t, attachCommand, nil, expectedState)
+}
+
+func Test_CommandListenerTypical(t *testing.T) {
 	attachCommand := []string{
 		"bash",
 		"-c",
@@ -93,7 +126,7 @@ echo "'test-app_v1_web_10023' changed state to [RUNNING]"`,
 	testAttach(t, attachCommand, filterRe, expectedState)
 }
 
-func Test_CommandListener2(t *testing.T) {
+func Test_CommandListenerSleepy(t *testing.T) {
 	attachCommand := []string{
 		"bash",
 		"-c",
