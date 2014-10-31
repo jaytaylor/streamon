@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	//"log"
+	"log"
 	"os/exec"
 	"regexp"
 )
+
+var debugEnabled bool
 
 var ErrEmptyAttachCommand = errors.New("attachCommand must not be empty")
 
@@ -47,17 +49,19 @@ func (this *CommandListener) Attach(ch chan []string) *CommandListener {
 		scanner := bufio.NewScanner(reader)
 		for scanner.Scan() {
 			text := scanner.Text()
+			debug("text=%v\n", text)
 			if this.FilterRe == nil {
+				debug("text=%v and auto forwarding because filter is empty\n", text)
 				ch <- []string{text}
 			} else if this.FilterRe.MatchString(text) {
 				match := this.FilterRe.FindStringSubmatch(text)
-				//log.Printf("match=%v\n", match)
+				debug("match=%v text=%v filter=%v\n", match, text, this.FilterRe.String())
 				ch <- match
-			} //else {
-			//	log.Printf("else... text=%v but did not match %v\n", text, this.FilterRe)
-			//}
+			} else {
+				debug("text=%v but did not match filter=%v\n", text, this.FilterRe.String())
+			}
 		}
-		//log.Println("NOTICE: reader loop exiting")
+		debug("reader loop exiting for AttachCommand=%v FilterRe=%v\n", this.AttachCommand, this.FilterRe)
 		close(ch)
 	}()
 
@@ -81,4 +85,10 @@ func (this *CommandListener) Attach(ch chan []string) *CommandListener {
 	}()
 
 	return this
+}
+
+func debug(message string, args ...interface{}) {
+	if debugEnabled {
+		log.Printf("DEBUG: streamon: "+message, args...)
+	}
 }

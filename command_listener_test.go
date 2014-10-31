@@ -10,11 +10,6 @@ type (
 	}
 )
 
-var (
-	// Consumes: 'test-app_v1_web_10023' changed state to [STARTING]
-	dynoStateParserRe = regexp.MustCompile(`'([^']+) changed state to \[([^\]]+)\]'`)
-)
-
 func Test_NewCommandListener(t *testing.T) {
 	cl, err := NewCommandListener([]string{}, nil)
 	if cl != nil {
