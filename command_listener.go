@@ -57,9 +57,9 @@ func (this *CommandListener) Attach(ch chan []string) *CommandListener {
 				match := this.FilterRe.FindStringSubmatch(text)
 				debug("match=%v text=%v filter=%v\n", match, text, this.FilterRe.String())
 				ch <- match
-			} else {
-				debug("text=%v but did not match filter=%v\n", text, this.FilterRe.String())
-			}
+			} //else {
+			//	debug("text=%v but did not match filter=%v\n", text, this.FilterRe.String())
+			//}
 		}
 		debug("reader loop exiting for AttachCommand=%v FilterRe=%v\n", this.AttachCommand, this.FilterRe)
 		close(ch)
@@ -68,10 +68,12 @@ func (this *CommandListener) Attach(ch chan []string) *CommandListener {
 	go func() {
 		cmd := exec.Command(this.AttachCommand[0], this.AttachCommand[1:]...)
 		cmd.Stdout = writer
+		//cmd.Stderr = writer
+		debug("cmd.Args=%v\n", cmd.Args)
 
 		err := cmd.Run()
 		if err != nil {
-			//log.Printf("CommandListener.Attach: error running ssh listener: %v\n", err)
+			debug("running command resulted in error=%v\n", err)
 			this.Error = err
 		}
 		err = reader.Close()

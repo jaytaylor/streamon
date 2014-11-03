@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-type (
-	TestCommandListener struct {
-	}
-)
-
 func Test_NewCommandListener(t *testing.T) {
 	cl, err := NewCommandListener([]string{}, nil)
 	if cl != nil {
