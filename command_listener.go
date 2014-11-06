@@ -37,11 +37,6 @@ func (this *CommandListener) Attach(ch chan []string) *CommandListener {
 		this.Error = ErrEmptyAttachCommand
 		return this
 	}
-	//if this.Running {
-	//	this.Error = fmt.Errorf("CommandListener is already running")
-	//	return this
-	//}
-	//this.Running = true
 
 	reader, writer := io.Pipe()
 
